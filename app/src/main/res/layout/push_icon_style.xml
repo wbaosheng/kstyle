@@ -1,0 +1,48 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+	<ImageView
+        android:id="@+id/custom_icon"
+        android:layout_width="100dip"
+        android:layout_height="match_parent"
+        android:layout_alignParentStart="true"
+		android:layout_centerVertical="true"
+        android:scaleType="fitCenter"
+		android:layout_alignParentLeft="true" />
+	<LinearLayout
+	    android:id="@+id/content_lay"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:layout_toStartOf="@+id/time"
+	    android:layout_centerVertical="true"
+	    android:layout_toEndOf="@id/custom_icon"
+	    android:orientation="vertical"
+		android:layout_toRightOf="@id/custom_icon"
+		android:layout_toLeftOf="@+id/time">
+	    <TextView
+	        android:id="@+id/title"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:singleLine="true"
+	        android:textSize="18sp">
+	    </TextView>
+	
+	    <TextView
+	        android:id="@+id/content"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:singleLine="true"
+	        android:textSize="14sp" >
+	    </TextView>
+	</LinearLayout>
+    <TextView
+        android:id="@+id/time"
+        android:layout_width="50dip"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignTop="@id/content_lay"
+        android:layout_marginTop="5dip"
+        android:singleLine="true"
+		android:layout_alignParentRight="true">
+    </TextView>
+</RelativeLayout>

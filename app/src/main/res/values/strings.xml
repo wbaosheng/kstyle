@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">KStyle</string>
+    <string name="deep_link">deep_link</string>
+</resources>
