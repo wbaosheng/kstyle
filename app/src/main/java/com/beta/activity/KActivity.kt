@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.Button
 import com.beta.R
 import kotlinx.android.synthetic.main.main_layout.*
+import reform.ko.task.test
 
 class KActivity : AppCompatActivity(), View.OnClickListener {
 
@@ -21,8 +22,8 @@ class KActivity : AppCompatActivity(), View.OnClickListener {
         bindView(kActivity, button_start_permission)
     }
 
-    private fun bindView(kActivity: KActivity, button: Button?) {
-        button!!.setOnClickListener(kActivity)
+    private fun bindView(kActivity: KActivity, button: Button) {
+        button.setOnClickListener(kActivity)
     }
 
     override fun onClick(v: View?) {
@@ -35,18 +36,7 @@ class KActivity : AppCompatActivity(), View.OnClickListener {
                 this.startActivity(intent)
             }
             button_start_permission -> {
-                val intent = Intent()
-                // vivo
-//                intent.action = "permission.intent.action.softPermissionDetail"
-//                intent.setClassName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.SoftPermissionDetailActivity")
-//                intent.putExtra("packagename", packageName)
-
-
-                // miui
-                intent.action = "miui.intent.action.APP_PERM_EDITOR_PRIVATE"
-                intent.setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
-                intent.putExtra("extra_pkgname", packageName)
-                startActivity(intent)
+                test()
             }
             button_exclude_recent_activity -> {
                 startActivity(Intent(this, ExcludeRecentActivity::class.java))

@@ -11,23 +11,23 @@ class LoadMoreRecyclerView : RecyclerView {
     var loading: Boolean = false
     var loadMoreListener: ILoadMoreListener? = null
 
-    constructor(context: Context?) : super(context) {
+    constructor(context: Context) : super(context) {
         init(context)
     }
 
-    constructor(context: Context?, attr: AttributeSet?) : super(context, attr) {
+    constructor(context: Context, attr: AttributeSet?) : super(context, attr) {
         init(context)
     }
 
-    constructor(context: Context?, attr: AttributeSet?, defStyleAttr: Int) : super(context, attr, defStyleAttr) {
+    constructor(context: Context, attr: AttributeSet?, defStyleAttr: Int) : super(context, attr, defStyleAttr) {
         init(context)
     }
 
-    private fun init(context: Context?) {
+    private fun init(context: Context) {
         addOnScrollListener(object : OnScrollListener() {
-            override fun onScrollStateChanged(recyclerView: RecyclerView?, newState: Int) {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 if (SCROLL_STATE_IDLE == newState && !loading) {
-                    val layoutManager: LayoutManager? = recyclerView?.layoutManager ?: return
+                    val layoutManager: LayoutManager? = recyclerView.layoutManager ?: return
                     var lastVisiblePosition = -1
                     if (layoutManager is LinearLayoutManager) {
                         lastVisiblePosition = layoutManager.findLastVisibleItemPosition();

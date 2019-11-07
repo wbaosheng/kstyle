@@ -51,21 +51,21 @@ class RecyclerActivity : AppCompatActivity() {
 
     private fun initList() {
         list.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-        var count = data.size
+        list.adapter = FeedAdapter(this, data)
+        val count = data.size
         list.loadMoreListener = object : ILoadMoreListener {
             override fun onLoadMore() {
                 list.postDelayed({
                     data.addAll(MutableList(CAPACITY) {
                         FeedData(count + it)
                     })
-                    list.adapter.notifyDataSetChanged()
+                    list.adapter!!.notifyDataSetChanged()
                     list.loading = false
                 }, 1000)
             }
 
         }
-        list.adapter = FeedAdapter(this, data)
-        list.adapter.notifyDataSetChanged()
+        (list.adapter as FeedAdapter).notifyDataSetChanged()
     }
 }
 
