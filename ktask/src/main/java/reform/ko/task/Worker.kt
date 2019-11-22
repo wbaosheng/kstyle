@@ -2,6 +2,8 @@ package reform.ko.task
 
 import android.os.*
 import reform.ko.internal.AVAILABLE_PROCESSORS
+import reform.ko.log.Logk
+import reform.ko.task.Worker.*
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -17,31 +19,36 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * * [IO]: process IO blocking jobs, ex: network, disk file.
  */
-public enum class Dispatch {
+public enum class Worker {
     MAIN, LOGIC, TASK, IO;
 }
 
 internal object JobDispatcher {
-    private val Main: Dispatcher = Dispatcher(Dispatch.MAIN)
+    private val Main: Dispatcher = Dispatcher(MAIN)
 
-    private val Logic: Dispatcher = Dispatcher(Dispatch.LOGIC)
+    private val Logic: Dispatcher = Dispatcher(LOGIC)
 
-    private val Task: Dispatcher = Dispatcher(Dispatch.TASK)
+    private val Task: Dispatcher = Dispatcher(TASK)
 
-    private val Io: Dispatcher = Dispatcher(Dispatch.IO)
+    private val Io: Dispatcher = Dispatcher(IO)
 
-    fun <T, R> dispatch(dispatch: Dispatch, element: Element<T, R>) {
-        val dispatcher = when (dispatch) {
-            Dispatch.MAIN -> Main
-            Dispatch.LOGIC -> Logic
-            Dispatch.TASK -> Task
-            Dispatch.IO -> Io
-        }
-        dispatcher.dispatch(element)
+    private fun get(worker: Worker) = when (worker) {
+        MAIN -> Main
+        LOGIC -> Logic
+        TASK -> Task
+        IO -> Io
+    }
+
+    fun <T, R> dispatch(worker: Worker, element: Element<T, R>) {
+        get(worker).dispatch(element)
+    }
+
+    fun <T, R> cancel(worker: Worker, element: Element<T, R>) {
+        get(worker).cancel(element)
     }
 }
 
-internal class Dispatcher(private val name: Dispatch) {
+internal class Dispatcher(private val name: Worker) {
     private val main = DispatchHandler(Looper.getMainLooper())
 
     private val logic by lazy {
@@ -58,20 +65,20 @@ internal class Dispatcher(private val name: Dispatch) {
 
     private val executor: ExecutorService by lazy {
         when (name) {
-            Dispatch.MAIN -> {
+            MAIN -> {
                 AndroidExecutorService(main)
             }
-            Dispatch.LOGIC -> {
+            LOGIC -> {
                 AndroidExecutorService(logic)
             }
-            Dispatch.TASK -> {
+            TASK -> {
                 ThreadPoolExecutor(AVAILABLE_PROCESSORS, AVAILABLE_PROCESSORS,
                         1L, TimeUnit.SECONDS,
                         LinkedBlockingQueue<Runnable>(),
                         NameThreadFactory("Task-", Process.THREAD_PRIORITY_BACKGROUND)
                 )
             }
-            Dispatch.IO -> {
+            IO -> {
                 ThreadPoolExecutor(AVAILABLE_PROCESSORS, AVAILABLE_PROCESSORS * 8,
                         1L, TimeUnit.SECONDS,
                         LinkedBlockingQueue<Runnable>(),
@@ -84,23 +91,26 @@ internal class Dispatcher(private val name: Dispatch) {
     fun <T, R> dispatch(element: Element<T, R>) {
         executor.execute(element.future)
     }
-}
 
-internal class DispatchHandler(looper: Looper) : Handler(looper) {
-
-    override fun handleMessage(msg: Message) {
-        when (msg.what) {
-            EXECUTOR_COMMAND -> {
-                val futureTask = msg.obj as FutureTask<*>
-                futureTask.run()
+    fun <T, R> cancel(element: Element<T, R>) {
+        when(name) {
+            MAIN -> {
+                main.removeCallbacks(element.future)
+                element.future!!.cancel(false)
+            }
+            LOGIC -> {
+                Logk.i(msg = "cancel ${element.future}")
+                logic.removeCallbacks(element.future)
+                element.future!!.cancel(false)
+            }
+            else -> {
+                element.future!!.cancel(true)
             }
         }
     }
-
-    companion object {
-        const val EXECUTOR_COMMAND = 1
-    }
 }
+
+internal class DispatchHandler(looper: Looper) : Handler(looper)
 
 internal class AndroidExecutorService(private val handler: DispatchHandler) : ExecutorService {
 
@@ -158,10 +168,8 @@ internal class AndroidExecutorService(private val handler: DispatchHandler) : Ex
     }
 
     override fun execute(command: Runnable?) {
+        Logk.i(msg = "execute post: $command")
         handler.post(command)
-        val msg = Message.obtain(handler)
-        msg.what = DispatchHandler.EXECUTOR_COMMAND
-        msg.obj = command
     }
 }
 

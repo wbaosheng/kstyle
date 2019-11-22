@@ -4,6 +4,7 @@ import reform.ko.log.Logk
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * The [JobTask] class represents anything that caller want to do.
@@ -12,18 +13,30 @@ import java.util.concurrent.FutureTask
  * will be cancelled.
  */
 public class JobTask private constructor() {
+    /**
+     * all element to processing
+     */
     private var element: Element<*, *>? = null
 
+    /**
+     * current processing element
+     */
+    private var curElement: AtomicReference<Element<*, *>> = AtomicReference()
+
+    /**
+     * the [JobTask] status
+     */
+    private var status: AtomicReference<JTStatus> = AtomicReference(JTStatus.INIT)
+
     init {
-        /** initialize job properties */
-        Logk.i(JobTask::class.java.simpleName, "JobTask init")
+        Logk.i(msg = "JobTask init")
     }
 
     companion object {
-        val Main = Dispatch.MAIN
-        val Logic = Dispatch.LOGIC
-        val Task = Dispatch.TASK
-        val Io = Dispatch.IO
+        val Main = Worker.MAIN
+        val Logic = Worker.LOGIC
+        val Task = Worker.TASK
+        val Io = Worker.IO
         inline fun build(block: (Builder.() -> Unit)) = Builder().apply(block).build()
     }
 
@@ -35,11 +48,11 @@ public class JobTask private constructor() {
      * [next] function constructs job [Element] that running on different thread. Only constructs
      * element don't execute block code until [JobTask.start] function.
      */
-    fun <T, R> next(dispatch: Dispatch, block: ((T?) -> R)) = apply {
+    fun <T, R> next(worker: Worker, block: ((T?) -> R)) = apply {
         element = if (element == null) {
-            Element(this, dispatch, block)
+            Element(0, this, worker, block)
         } else {
-            element!! + Element(this, dispatch, block)
+            element!! + Element(element!!.id + 1, this, worker, block)
         }
     }
 
@@ -47,7 +60,35 @@ public class JobTask private constructor() {
      * Start execute element's block code one by one.
      */
     fun start(param: Any? = null) = apply {
-        element?.start(param)
+        status.set(JTStatus.RUNNING)
+        element?.let {
+            curElement.set(it)
+            curElement.get().start(param)
+        }
+    }
+
+    /**
+     * Cancel current running [JobTask]. If the [JobTask] isn't running, do nothing.
+     */
+    fun cancel() {
+        if (status.compareAndSet(JTStatus.RUNNING, JTStatus.CANCEL)) {
+            curElement.get().cancel()
+        } else {
+            status.set(JTStatus.CANCEL)
+        }
+    }
+
+    internal fun processNext(element: Element<*, *>) {
+        curElement.set(element)
+    }
+
+    internal fun finishJobTask(e: Exception? = null) {
+        Logk.i(msg = "finishJobTask ${curElement.get().id}")
+        status.set(JTStatus.COMPLETE)
+        e?.apply {
+            Logk.e(JobTask::class.java.simpleName,
+                    "finishJobTask with e: ${e.localizedMessage}")
+        }
     }
 }
 
@@ -59,12 +100,13 @@ public class JobTask private constructor() {
  * element's input parameter is transferred by [JobTask.start] function.
  */
 internal class Element<T, R>(
-        private val job: JobTask,
-        private val dispatch: Dispatch,
+        internal val id: Int,
+        private val jobTask: JobTask,
+        private val worker: Worker,
         private val block: (T?) -> R
 ) {
 
-    internal var next: Element<*, *>? = null
+    private var next: Element<*, *>? = null
 
     var future: FutureElement<T, R>? = null
 
@@ -81,20 +123,34 @@ internal class Element<T, R>(
         @Suppress("UNCHECKED_CAST")
         val p = param as T?
         future = FutureElement(this, ElementCallable(p, block))
-        JobDispatcher.dispatch(dispatch, this)
+        JobDispatcher.dispatch(worker, this)
     }
 
-    fun doNext() {
+    fun cancel() {
+        Logk.i(msg = "cancel element: $id")
+        JobDispatcher.cancel(worker, this)
+    }
+
+    fun processNext() {
+        Logk.i(msg = "processNext current: $id")
         if (future!!.isCancelled) {
             return
         }
         try {
-            next?.start(future!!.get())
+            // 正常执行完成
+            if (next == null) {
+                jobTask.finishJobTask()
+            } else {
+                Logk.i(msg = "processNext next: ${next!!.id}")
+                // 执行下一个element
+                jobTask.processNext(next!!)
+                next!!.start(future!!.get())
+            }
         } catch (e: InterruptedException) {
-            Logk.e(Element::class.java.simpleName, e.localizedMessage)
+            jobTask.finishJobTask(e)
             return
         } catch (e: ExecutionException) {
-            Logk.e(Element::class.java.simpleName, e.localizedMessage)
+            jobTask.finishJobTask(e)
             return
         }
     }
@@ -112,12 +168,19 @@ internal class Element<T, R>(
             private val element: Element<T, R>,
             callable: Callable<R>
     ) : FutureTask<R>(callable) {
-        override fun run() {
-            super.run()
-        }
 
         override fun done() {
-            element.doNext()
+            element.processNext()
         }
     }
+}
+
+/**
+ * Represent the [JobTask] status
+ */
+internal enum class JTStatus(val status: Int) {
+    INIT(0),
+    CANCEL(1),
+    RUNNING(2),
+    COMPLETE(3)
 }

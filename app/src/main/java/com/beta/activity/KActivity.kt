@@ -37,7 +37,8 @@ class KActivity : AppCompatActivity(), View.OnClickListener {
                 this.startActivity(intent)
             }
             button_start_permission -> {
-                startBackgroundJob()
+                var job = startBackgroundJob()
+                job.cancel()
             }
             button_exclude_recent_activity -> {
                 startActivity(Intent(this, ExcludeRecentActivity::class.java))
@@ -46,19 +47,20 @@ class KActivity : AppCompatActivity(), View.OnClickListener {
     }
 
     private fun startBackgroundJob(): JobTask {
-        Logk.d("ktask", "startBackgroundJob()")
-        var out = 1
+        Logk.d(msg = "startBackgroundJob")
         return JobTask.build {
-        }.next<String, Int>(JobTask.Task) {
-            out++
-            val a = "a"
-            val b = "b"
-            val c = a + b
-            Logk.d("ktask", "JobTask->Task $c")
+        }.next<String, Int>(JobTask.Logic) {
+            Logk.d(msg = "JobTask->Logic")
             1
         }.next<Int, String>(JobTask.Io) {
-            val a = 0
-            Logk.d("ktask", "JobTask->Io $a")
+            Logk.d(msg = "JobTask->Io")
+            for (i in 1..10) {
+                Logk.d(msg = "JobTask->Io i=$i")
+                Thread.sleep(1000)
+            }
+            "a"
+        }.next<String, String>(JobTask.Task) {
+            Logk.d(msg = "JobTask->Task")
             "a"
         }.start()
     }
