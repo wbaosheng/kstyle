@@ -5,36 +5,18 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 
-fun test() {
-    Logk.d("ktask", "test()")
-    var out = 1
-    Job.build {
-    }.next<String, Int>(Job.Task) {
-        out++
-        val a = "a"
-        val b = "b"
-        val c = a + b
-        Logk.d("ktask", "Job->Task $c")
-        1
-    }.next<Int, String>(Job.Io) {
-        val a = 0
-        Logk.d("ktask", "Job->Io $a")
-        "a"
-    }.on(null)
-}
-
 /**
- * The [Job] class represents anything that caller want to do.
+ * The [JobTask] class represents anything that caller want to do.
  *
- * Job is consist of many elements and do each element one by one. If Job is cancelled, all element
+ * JobTask is consist of many elements and do each element one by one. If JobTask is cancelled, all element
  * will be cancelled.
  */
-public class Job private constructor() {
+public class JobTask private constructor() {
     private var element: Element<*, *>? = null
 
     init {
         /** initialize job properties */
-        Logk.i(Job::class.java.simpleName, "Job init")
+        Logk.i(JobTask::class.java.simpleName, "JobTask init")
     }
 
     companion object {
@@ -46,12 +28,12 @@ public class Job private constructor() {
     }
 
     class Builder {
-        fun build() = Job()
+        fun build() = JobTask()
     }
 
     /**
      * [next] function constructs job [Element] that running on different thread. Only constructs
-     * element don't execute block code until [Job.on] function.
+     * element don't execute block code until [JobTask.start] function.
      */
     fun <T, R> next(dispatch: Dispatch, block: ((T?) -> R)) = apply {
         element = if (element == null) {
@@ -64,20 +46,20 @@ public class Job private constructor() {
     /**
      * Start execute element's block code one by one.
      */
-    fun on(param: Any?) = apply {
-        element?.on(param)
+    fun start(param: Any? = null) = apply {
+        element?.start(param)
     }
 }
 
 /**
  * The lambda expression that execute on the dispatcher.
  *
- * One job may consist of multi element linked by [Job.next] function, the dispatcher runs each element
+ * One job may consist of multi element linked by [JobTask.next] function, the dispatcher runs each element
  * one by one. Each element's input parameter is previous element's output result, the first
- * element's input parameter is transferred by [Job.on] function.
+ * element's input parameter is transferred by [JobTask.start] function.
  */
 internal class Element<T, R>(
-        private val job: Job,
+        private val job: JobTask,
         private val dispatch: Dispatch,
         private val block: (T?) -> R
 ) {
@@ -95,7 +77,7 @@ internal class Element<T, R>(
         return this
     }
 
-    fun on(param: Any?) {
+    fun start(param: Any?) {
         @Suppress("UNCHECKED_CAST")
         val p = param as T?
         future = FutureElement(this, ElementCallable(p, block))
@@ -107,7 +89,7 @@ internal class Element<T, R>(
             return
         }
         try {
-            next?.on(future!!.get())
+            next?.start(future!!.get())
         } catch (e: InterruptedException) {
             Logk.e(Element::class.java.simpleName, e.localizedMessage)
             return

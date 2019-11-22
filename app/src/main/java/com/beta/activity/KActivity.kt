@@ -7,7 +7,8 @@ import android.view.View
 import android.widget.Button
 import com.beta.R
 import kotlinx.android.synthetic.main.main_layout.*
-import reform.ko.task.test
+import reform.ko.log.Logk
+import reform.ko.task.JobTask
 
 class KActivity : AppCompatActivity(), View.OnClickListener {
 
@@ -36,12 +37,30 @@ class KActivity : AppCompatActivity(), View.OnClickListener {
                 this.startActivity(intent)
             }
             button_start_permission -> {
-                test()
+                startBackgroundJob()
             }
             button_exclude_recent_activity -> {
                 startActivity(Intent(this, ExcludeRecentActivity::class.java))
             }
         }
+    }
+
+    private fun startBackgroundJob(): JobTask {
+        Logk.d("ktask", "startBackgroundJob()")
+        var out = 1
+        return JobTask.build {
+        }.next<String, Int>(JobTask.Task) {
+            out++
+            val a = "a"
+            val b = "b"
+            val c = a + b
+            Logk.d("ktask", "JobTask->Task $c")
+            1
+        }.next<Int, String>(JobTask.Io) {
+            val a = 0
+            Logk.d("ktask", "JobTask->Io $a")
+            "a"
+        }.start()
     }
 }
 
